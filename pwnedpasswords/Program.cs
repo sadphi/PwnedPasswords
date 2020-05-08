@@ -14,10 +14,6 @@ namespace pwnedpasswords
 {
     class Program
     {
-        /*TODO:
-        - Check multiple passwords at a time
-        - Allow piping
-        */
         static readonly HttpClient client = new HttpClient();
         static async Task Main(string[] args)
         {
@@ -64,7 +60,7 @@ namespace pwnedpasswords
                     pwList = await response.Content.ReadAsStringAsync();
 
                 else
-                    Console.WriteLine(string.Format("Request denied! Code: {0}", response.StatusCode));
+                    Console.WriteLine($"Request denied! Code: {response.StatusCode}");
             }
 
             catch (HttpRequestException exception)
@@ -87,18 +83,14 @@ namespace pwnedpasswords
 
                 string toConvert = pwList.Substring(start, length); //Create a string which will only contain the "amount of times seen"
 
-                //Try parsing to an int so we can format it
-                int amount;
-                if (int.TryParse(toConvert, out int res))
-                    amount = res;
-                else
-                    amount = 0;
+                //Try parsing to an int so we can format it in the output
+                int.TryParse(toConvert, out int amount);
 
                 //Clone the current culture's NumberFormatInfo and disable decimal digits
                 NumberFormatInfo numberFormatInfo = (NumberFormatInfo) NumberFormatInfo.CurrentInfo.Clone();
                 numberFormatInfo.NumberDecimalDigits = 0;
 
-                Console.WriteLine(string.Format("This password has been pwned, and it has been seen {0} times!" + Environment.NewLine + "Pwned Hash: {1}" + Environment.NewLine + "Pwned Password: {2}", amount.ToString("N", numberFormatInfo), hash, password));
+                Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + Environment.NewLine + $"Pwned Hash: {hash}" + Environment.NewLine + $"Pwned Password: {password}");
             }
 
             else
