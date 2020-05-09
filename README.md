@@ -29,4 +29,4 @@ Currently the program only accepts one password as a launch argument, which mean
 
 ## To-Do
 - [x] Check multiple passwords at a time
-- [ ] Allow piping
+- [x] Allow piping

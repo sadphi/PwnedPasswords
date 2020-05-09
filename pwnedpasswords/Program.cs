@@ -26,7 +26,17 @@ namespace pwnedpasswords
 #endif
 
 #if RELEASE
-            if (args.Length != 0)
+            //If the user has redirected an input to stdin (by piping [|] or redirecting [<]), read each line
+            if (Console.IsInputRedirected)
+            {
+                string rl;
+                while ((rl = Console.ReadLine()) != null)
+                {
+                    passwordList.Add(rl);
+                }
+            }
+
+            else if (args.Length != 0)
             {
                 foreach (string s in args)
                 {
