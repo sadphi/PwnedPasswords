@@ -3,6 +3,7 @@
 //file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Http;
@@ -17,86 +18,91 @@ namespace pwnedpasswords
         static readonly HttpClient client = new HttpClient();
         static async Task Main(string[] args)
         {
-            string password;
+            List<string> passwordList = new List<string>();
 
             #region Program Start options
 #if DEBUG
-            password = "password";
+            passwordList.Add("password");
 #endif
 
 #if RELEASE
-            password = string.Empty;
-            if (args.Length == 0)
+            if (args.Length != 0)
             {
-                Console.WriteLine("Please specify a password!" + Environment.NewLine + Environment.NewLine + "The following format must be used: passwordchecker [password]");
-                Console.ReadKey();
-                Environment.Exit(-1);
-            }
-
-            if (args.Length == 1)
-            {
-                password = args[0];
+                foreach (string s in args)
+                {
+                    passwordList.Add(s);
+                }
             }
 
             else
             {
-                Console.WriteLine("Only specify 1 password!");
-                Console.ReadKey();
+                Console.WriteLine("Please specify at least one password!" + Environment.NewLine + Environment.NewLine + "The following format must be used: pwnedpasswords [password1] [password2] [...]");
                 Environment.Exit(-1);
             }
 #endif
             #endregion
 
+            List<string> hashList = new List<string>();
+            List<string> queryList = new List<string>(); //The list of shortened hashes to send to the HIBP API
 
-            string hash = Hash(password);
-            string query = hash.Remove(5); //Only keep the 5 first characters in the query
-
-            string pwList = string.Empty;
-            try
+            //Hash every password and add them to a list
+            foreach (string pw in passwordList)
             {
-                var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{query}");
+                hashList.Add(Hash(pw));
+            }
 
-                if (response.StatusCode == HttpStatusCode.OK)
-                    pwList = await response.Content.ReadAsStringAsync();
+
+            foreach (string hash in hashList)
+            {
+                queryList.Add(hash.Remove(5)); //Only keep the 5 first characters in the query
+            }
+
+            for (int i = 0; i < queryList.Count; i++)
+            {
+                string returnedHashes = string.Empty;
+                try
+                {
+                    var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{queryList[i]}");
+
+                    if (response.StatusCode == HttpStatusCode.OK)
+                        returnedHashes = await response.Content.ReadAsStringAsync();
+
+                    else
+                        Console.WriteLine($"Request denied! Code: {response.StatusCode}");
+                }
+
+                catch (HttpRequestException exception)
+                {
+                    Console.WriteLine("Could not connect to remote:" + Environment.NewLine + Environment.NewLine + exception + Environment.NewLine + Environment.NewLine + "Press any key to quit");
+                    Console.ReadKey();
+                    Environment.Exit(-1);
+                }
+
+
+                string hashTruncated = hashList[i].Substring(5); //Remove the first 5 characters from the hash, but keep the rest
+
+                if (returnedHashes.Contains(hashTruncated)) //Check if the response data contains our hash
+                {
+                    //Parse the amount of times this password has been "seen"
+                    int start = returnedHashes.IndexOf(hashTruncated);
+                    start += hashTruncated.Length + 1;                          //The start index of "amount of times seen" (+ 1 to remove ':')
+                    int end = returnedHashes.IndexOf("\r\n", start);            //The end index of "amount of times seen"
+                    int length = Math.Abs(start - end);                         //The amount of digits in the number
+
+
+                    int.TryParse(returnedHashes.Substring(start, length), out int amount); //Substring() creates a string which is equal to the number "amount of times seen".
+                                                                                           //This is parsed to an int so we can format it in the output.
+
+                    //Clone the current culture's NumberFormatInfo and disable decimal digits, so that they won't appear in the output
+                    NumberFormatInfo numberFormatInfo = (NumberFormatInfo)NumberFormatInfo.CurrentInfo.Clone();
+                    numberFormatInfo.NumberDecimalDigits = 0;
+
+                    Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + Environment.NewLine + $"Pwned Hash: {hashList[i]}" + Environment.NewLine + $"Pwned Password: {passwordList[i]}" + Environment.NewLine);
+                }
 
                 else
-                    Console.WriteLine($"Request denied! Code: {response.StatusCode}");
+                    Console.WriteLine("Phew — This password has not been pwned!");
             }
-
-            catch (HttpRequestException exception)
-            {
-                Console.WriteLine("Could not connect to remote:" + Environment.NewLine + Environment.NewLine + exception + Environment.NewLine + Environment.NewLine + "Press any key to quit");
-                Console.ReadKey();
-                Environment.Exit(-1);
-            }
-
-
-            string hashTruncated = hash.Substring(5); //Remove the first 5 characters from the hash
-
-            if (pwList.Contains(hashTruncated)) //Check if the response data contains our hash
-            {
-                //Fetch the amount of times this password has been "seen"
-                int start = pwList.IndexOf(hashTruncated);
-                start += hashTruncated.Length + 1;                  //The start index of "amount of times seen" (+ 1 to remove ':')
-                int end = pwList.IndexOf("\r\n", start);            //The end index of "amount of times seen"
-                int length = Math.Abs(start - end);                 //The amount of digits
-
-                string toConvert = pwList.Substring(start, length); //Create a string which will only contain the "amount of times seen"
-
-                //Try parsing to an int so we can format it in the output
-                int.TryParse(toConvert, out int amount);
-
-                //Clone the current culture's NumberFormatInfo and disable decimal digits
-                NumberFormatInfo numberFormatInfo = (NumberFormatInfo) NumberFormatInfo.CurrentInfo.Clone();
-                numberFormatInfo.NumberDecimalDigits = 0;
-
-                Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + Environment.NewLine + $"Pwned Hash: {hash}" + Environment.NewLine + $"Pwned Password: {password}");
-            }
-
-            else
-                Console.WriteLine("Phew — This password has not been pwned!");
-
-            Console.ReadKey();
         }
 
         /// <summary>

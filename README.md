@@ -28,5 +28,5 @@ Pwned Password: password
 Currently the program only accepts one password as a launch argument, which means it won't do anything if nothing is specified. 
 
 ## To-Do
-- [ ] Check multiple passwords at a time
+- [x] Check multiple passwords at a time
 - [ ] Allow piping
