@@ -31,7 +31,7 @@ Currently the program requires passwords to be input as launch argument, which m
 
 ## To-Do
 - [x] Check multiple passwords at a time
-- [ ] Allow piping
+- [x] Allow piping
 
 ## Data source
 This project uses [Have I Been Pwned](https://haveibeenpwned.com) to check if a password has leaked.
