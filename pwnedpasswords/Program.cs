@@ -15,6 +15,7 @@ namespace pwnedpasswords
 {
     class Program
     {
+        static string nl = Environment.NewLine;
         static readonly HttpClient client = new HttpClient();
         static async Task Main(string[] args)
         {
@@ -46,7 +47,7 @@ namespace pwnedpasswords
 
             else
             {
-                Console.WriteLine("Please specify at least one password!" + Environment.NewLine + Environment.NewLine + "The following format must be used: pwnedpasswords [password1] [password2] [...]");
+                Console.WriteLine("Please specify at least one password!" + nl + nl + "The following format must be used: pwnedpasswords [password1] [password2] [...]");
                 Environment.Exit(-1);
             }
 #endif
@@ -83,7 +84,7 @@ namespace pwnedpasswords
 
                 catch (HttpRequestException exception)
                 {
-                    Console.WriteLine("Could not connect to remote:" + Environment.NewLine + Environment.NewLine + exception + Environment.NewLine + Environment.NewLine + "Press any key to quit");
+                    Console.WriteLine("Could not connect to remote:" + nl + nl + exception + nl + nl + "Press any key to quit");
                     Console.ReadKey();
                     Environment.Exit(-1);
                 }
@@ -107,7 +108,7 @@ namespace pwnedpasswords
                     NumberFormatInfo numberFormatInfo = (NumberFormatInfo)NumberFormatInfo.CurrentInfo.Clone();
                     numberFormatInfo.NumberDecimalDigits = 0;
 
-                    Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + Environment.NewLine + $"Pwned Hash: {hashList[i]}" + Environment.NewLine + $"Pwned Password: {passwordList[i]}" + Environment.NewLine);
+                    Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + nl + $"Pwned Hash: {hashList[i]}" + nl + $"Pwned Password: {passwordList[i]}" + nl);
                 }
 
                 else
