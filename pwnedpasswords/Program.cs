@@ -62,32 +62,15 @@ namespace pwnedpasswords
                 hashList.Add(Hash(pw));
             }
 
-
-            foreach (string hash in hashList)
+            QueryHIBP(hashList).Result.ForEach(delegate (String res)
             {
-                queryList.Add(hash.Remove(5)); //Only keep the 5 first characters in the query
-            }
+                Console.WriteLine(res);
+            });
 
             for (int i = 0; i < queryList.Count; i++)
             {
                 string returnedHashes = string.Empty;
-                try
-                {
-                    var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{queryList[i]}");
 
-                    if (response.StatusCode == HttpStatusCode.OK)
-                        returnedHashes = await response.Content.ReadAsStringAsync();
-
-                    else
-                        Console.WriteLine($"Request denied! Code: {response.StatusCode}");
-                }
-
-                catch (HttpRequestException exception)
-                {
-                    Console.WriteLine("Could not connect to remote:" + nl + nl + exception + nl + nl + "Press any key to quit");
-                    Console.ReadKey();
-                    Environment.Exit(-1);
-                }
 
 
                 string hashTruncated = hashList[i].Substring(5); //Remove the first 5 characters from the hash, but keep the rest
@@ -114,6 +97,46 @@ namespace pwnedpasswords
                 else
                     Console.WriteLine("Phew — This password has not been pwned!");
             }
+        }
+
+        /// <summary>
+        /// Queries the HIBP passwords API to find a match to each hash defined in the parameter.
+        /// </summary>
+        /// <param name="hashes">A List containing SHA-1 hashes of passwords, where each element will be checked against HIBP.</param>
+        /// <returns>A List of strings, where each string contains all the hashes returned from HIBP. See the HIBP documentation.</returns>
+        static async Task<List<string>> QueryHIBP(List<string> hashes)
+        {
+            List<string> trimmedHashes = new List<string>();
+
+            foreach (string hash in hashes)
+            {
+                trimmedHashes.Add(hash.Remove(5));
+            }
+
+            List<string> result = new List<string>();
+
+            foreach (string shortHash in trimmedHashes)
+            {
+                try
+                {
+                    var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{shortHash}");
+
+                    if (response.StatusCode == HttpStatusCode.OK)
+                        result.Add(await response.Content.ReadAsStringAsync());
+
+                    else
+                        Console.WriteLine($"Request denied! Code: {response.StatusCode}");
+                }
+
+                catch (HttpRequestException exception)
+                {
+                    Console.WriteLine("Could not connect to remote:" + nl + nl + exception + nl + nl + "Press any key to quit");
+                    Console.ReadKey();
+                    Environment.Exit(-1);
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
