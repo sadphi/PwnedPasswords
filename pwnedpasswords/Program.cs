@@ -15,7 +15,7 @@ namespace pwnedpasswords
 {
     class Program
     {
-        static string nl = Environment.NewLine;
+        static readonly string nl = Environment.NewLine;
         static readonly HttpClient client = new HttpClient();
         static async Task Main(string[] args)
         {
@@ -117,15 +117,15 @@ namespace pwnedpasswords
         }
 
         /// <summary>
-        /// Create a hash of a specified password using SHA-1
+        /// Generate the hash of a string using SHA-1
         /// </summary>
-        /// <param name="password">The password to hash</param>
-        /// <returns></returns>
-        static string Hash(string password)
+        /// <param name="data">The string to hash</param>
+        /// <returns>The SHA-1 hash of the argument</returns>
+        static string Hash(string data)
         {
             SHA1 sha1 = new SHA1CryptoServiceProvider();
 
-            byte[] hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(password));
+            byte[] hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(data));
 
             StringBuilder stringBuilder = new StringBuilder(hash.Length * 2);
 
