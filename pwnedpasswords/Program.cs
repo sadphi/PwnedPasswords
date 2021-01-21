@@ -17,6 +17,7 @@ namespace pwnedpasswords
     {
         static readonly string nl = Environment.NewLine;
         static readonly HttpClient client = new HttpClient();
+        static Dictionary<string, string> hashes = new Dictionary<string, string>(); //hash -> password (not hashed)
         static async Task Main(string[] args)
         {
             List<string> passwordList = new List<string>();
@@ -53,58 +54,79 @@ namespace pwnedpasswords
 #endif
             #endregion
 
-            List<string> hashList = new List<string>();
             List<string> queryList = new List<string>(); //The list of shortened hashes to send to the HIBP API
 
             //Hash every password and add them to a list
             foreach (string pw in passwordList)
             {
-                hashList.Add(Hash(pw));
+                hashes.TryAdd(Hash(pw), pw);
             }
 
-            QueryHIBP(hashList).Result.ForEach(delegate (String res)
+            var respone = QueryHIBP(new List<string>(hashes.Keys)).Result;
+            PrintResult(IsPwned(respone));
+        }
+
+        /// <summary>
+        /// Print all pwned passwords.
+        /// </summary>
+        /// <param name="pwnedPasswords">The Dictionary containing pwned passwords. (hash -> amount)</param>
+        static void PrintResult(Dictionary<string, int> pwnedPasswords)
+        {
+            if (pwnedPasswords.Count != 0)
             {
-                Console.WriteLine(res);
-            });
+                //Clone the current culture's NumberFormatInfo and disable decimal digits, so that they won't appear in the output
+                NumberFormatInfo numberFormatInfo = (NumberFormatInfo)NumberFormatInfo.CurrentInfo.Clone();
+                numberFormatInfo.NumberDecimalDigits = 0;
 
-            for (int i = 0; i < queryList.Count; i++)
+                Console.WriteLine($"Oh no. These passwords have been pwned:{nl}");
+
+                foreach (var p in pwnedPasswords)
+                {
+                    Console.WriteLine($"{hashes[p.Key]} ({p.Key}), which has been seen {p.Value.ToString("N", numberFormatInfo)} times.");
+                }
+            }
+
+            else
+                Console.WriteLine("Phew — No password has been pwned!");
+        }
+
+        /// <summary>
+        /// Check if some hashes are compromised, and return those that are and the amount of times they have been seen.
+        /// </summary>
+        /// <param name="response">The result of method QueryHIBP, containing (hash -> response).</param>
+        /// <returns>A Dictionary with pairs of (hash -> amount), where 'hash' is the hashed password, and 'amount' is the amount of times the password has been seen by HIBP.</returns>
+        static Dictionary<string, int> IsPwned(Dictionary<string, string> response)
+        {
+            Dictionary<string, int> result = new Dictionary<string, int>();
+
+            foreach (var p in response) //Each pair is hash -> response of all matching hashes from HIBP
             {
-                string returnedHashes = string.Empty;
+                string hashTruncated = p.Key.Substring(5); //Remove the first 5 characters from the hash, but keep the rest
+                string searchResult = p.Value;
 
-
-
-                string hashTruncated = hashList[i].Substring(5); //Remove the first 5 characters from the hash, but keep the rest
-
-                if (returnedHashes.Contains(hashTruncated)) //Check if the response data contains our hash
+                if (searchResult.Contains(hashTruncated)) //Check if the response data contains our hash
                 {
                     //Parse the amount of times this password has been "seen"
-                    int start = returnedHashes.IndexOf(hashTruncated);
-                    start += hashTruncated.Length + 1;                          //The start index of "amount of times seen" (+ 1 to remove ':')
-                    int end = returnedHashes.IndexOf("\r\n", start);            //The end index of "amount of times seen"
-                    int length = Math.Abs(start - end);                         //The amount of digits in the number
+                    int start = searchResult.IndexOf(hashTruncated);
+                    start += hashTruncated.Length + 1;                               //The start index of "amount of times seen" (+ 1 to remove ':')
+                    int end = searchResult.IndexOf("\r\n", start);                   //The end index of "amount of times seen"
+                    int length = Math.Abs(start - end);                              //The amount of digits in the number
 
 
-                    int.TryParse(returnedHashes.Substring(start, length), out int amount); //Substring() creates a string which is equal to the number "amount of times seen".
-                                                                                           //This is parsed to an int so we can format it in the output.
-
-                    //Clone the current culture's NumberFormatInfo and disable decimal digits, so that they won't appear in the output
-                    NumberFormatInfo numberFormatInfo = (NumberFormatInfo)NumberFormatInfo.CurrentInfo.Clone();
-                    numberFormatInfo.NumberDecimalDigits = 0;
-
-                    Console.WriteLine($"This password has been pwned, and it has been seen {amount.ToString("N", numberFormatInfo)} times!" + nl + $"Pwned Hash: {hashList[i]}" + nl + $"Pwned Password: {passwordList[i]}" + nl);
+                    int.TryParse(searchResult.Substring(start, length), out int amount);        //Substring() creates a string which is equal to the number "amount of times seen".
+                                                                                                //This is parsed to an int so we can format it in the output.
+                    result.Add(p.Key, amount);
                 }
-
-                else
-                    Console.WriteLine("Phew — This password has not been pwned!");
             }
+            return result;
         }
 
         /// <summary>
         /// Queries the HIBP passwords API to find a match to each hash defined in the parameter.
         /// </summary>
         /// <param name="hashes">A List containing SHA-1 hashes of passwords, where each element will be checked against HIBP.</param>
-        /// <returns>A List of strings, where each string contains all the hashes returned from HIBP. See the HIBP documentation.</returns>
-        static async Task<List<string>> QueryHIBP(List<string> hashes)
+        /// <returns>A Dictionary with pairs of (hash -> response), where 'hash' is the hashed password, and 'response' is the respone from HIBP (a string of matching hashes).</returns>
+        static async Task<Dictionary<string, string>> QueryHIBP(List<string> hashes)
         {
             List<string> trimmedHashes = new List<string>();
 
@@ -113,16 +135,16 @@ namespace pwnedpasswords
                 trimmedHashes.Add(hash.Remove(5));
             }
 
-            List<string> result = new List<string>();
+            Dictionary<string, string> result = new Dictionary<string, string>();
 
-            foreach (string shortHash in trimmedHashes)
+            for (int i = 0; i < trimmedHashes.Count; i++)
             {
                 try
                 {
-                    var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{shortHash}");
+                    var response = await client.GetAsync($"https://api.pwnedpasswords.com/range/{trimmedHashes[i]}");
 
                     if (response.StatusCode == HttpStatusCode.OK)
-                        result.Add(await response.Content.ReadAsStringAsync());
+                        result.Add(hashes[i], await response.Content.ReadAsStringAsync());
 
                     else
                         Console.WriteLine($"Request denied! Code: {response.StatusCode}");
