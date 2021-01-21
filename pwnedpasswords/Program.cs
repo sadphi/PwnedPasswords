@@ -62,7 +62,8 @@ namespace pwnedpasswords
                 hashes.TryAdd(Hash(pw), pw);
             }
 
-            var respone = QueryHIBP(new List<string>(hashes.Keys)).Result;
+            var query = new List<string>(hashes.Keys);
+            var respone = QueryHIBP(query).Result;
             PrintResult(IsPwned(respone));
         }
 
